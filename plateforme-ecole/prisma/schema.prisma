@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Énumération pour les rôles, plus sûr que des chaînes de caractères
+enum Role {
+  ADMIN
+  PROF
+  ELEVE
+}
+
+model User {
+  id          String    @id @default(cuid())
+  nom         String
+  email       String    @unique
+  motDePasse  String
+  role        Role
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  classe      Classe?   @relation("ClasseEleves", fields: [classeId], references: [id])
+  classeId    String?   // Un utilisateur peut ne pas avoir de classe (ex: admin)
+
+  coursEnseignes Cours[]   @relation("ProfCours") // Cours enseignés par un prof
+  notes       Note[]
+  absences    Absence[]
+  messagesEnvoyes Message[] @relation("Expediteur")
+  messagesRecus   Message[] @relation("Destinataire")
+  classePrincipale Classe[] @relation("ProfPrincipal")
+}
+
+model Classe {
+  id              String    @id @default(cuid())
+  nom             String
+  niveau          String    // ex: "6ème", "Terminale"
+  profPrincipal   User?     @relation("ProfPrincipal", fields: [profPrincipalId], references: [id])
+  profPrincipalId String?   @unique
+  anneeScolaire   String    // ex: "2023-2024"
+
+  // Relations
+  eleves          User[]    @relation("ClasseEleves")
+  cours           Cours[]
+}
+
+model Cours {
+  id          String    @id @default(cuid())
+  titre       String
+  description String?
+  heure       String    // ex: "09:00 - 10:00"
+  jour        String    // ex: "Lundi"
+
+  // Relations
+  classe      Classe    @relation(fields: [classeId], references: [id])
+  classeId    String
+  prof        User      @relation("ProfCours", fields: [profId], references: [id])
+  profId      String
+  notes       Note[]
+  absences    Absence[]
+}
+
+model Note {
+  id          String    @id @default(cuid())
+  valeur      Float     // La note chiffrée
+  commentaire String?
+  date        DateTime  @default(now())
+
+  // Relations
+  eleve       User      @relation(fields: [eleveId], references: [id])
+  eleveId     String
+  cours       Cours     @relation(fields: [coursId], references: [id])
+  coursId     String
+
+  @@unique([eleveId, coursId]) // Un élève a une seule note par cours
+}
+
+model Absence {
+  id          String    @id @default(cuid())
+  date        DateTime
+  motif       String?
+  justifiee   Boolean   @default(false)
+
+  // Relations
+  eleve       User      @relation(fields: [eleveId], references: [id])
+  eleveId     String
+  cours       Cours     @relation(fields: [coursId], references: [id])
+  coursId     String
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  contenu         String
+  date            DateTime  @default(now())
+  lu              Boolean   @default(false)
+
+  // Relations
+  expediteur      User      @relation("Expediteur", fields: [expediteurId], references: [id])
+  expediteurId    String
+  destinataire    User      @relation("Destinataire", fields: [destinataireId], references: [id])
+  destinataireId  String
+}
